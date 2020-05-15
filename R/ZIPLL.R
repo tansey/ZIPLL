@@ -16,7 +16,8 @@ knots <- c(min(internal.knots)-external.knots,internal.knots,max(internal.knots)
 knots <- knots[order(knots)]
 
 # Get all unique doses for predictions
-pred.conc = rep(unique(dat[,3]), nchems*nassays)
+pred.nconc = unique(dat[,3])
+pred.conc = rep(pred.nconc, nchems*nassays)
 pred.n = rep(length(unique(dat[,3])), nchems*nassays)
 pred.BE = rep(0,nchems*nassays*nij)
 pred.BEsd = rep(0,nchems*nassays*nij)
@@ -54,8 +55,8 @@ labels <- expand.grid( x=unique(dat[,2]) , y=unique(dat[,1]) )
 parms <- cbind(labels[,2],labels[,1],dat.out$AC50,dat.out$AC50sd,dat.out$TOP,dat.out$TOPsd,dat.out$active)
 colnames(parms) <- c("chemical","assay","AC50","AC50.sd","Emax","Emax.sd","Pr.Active")
 
-pred = cbind(dat.out$predBE, dat.out$predBEsd)
-colnames(pred) <- c("Pred","Pred.SD")
+pred = cbind(rep(labels[,2], each=pred.nconc), rep(labels[,1], each=pred.nconc), pred.conc, dat.out$predBE, dat.out$predBEsd)
+colnames(pred) <- c("chemical", "assay", "conc", "Pred","Pred.SD")
 
 return(list(dat=dat, parms=parms,pred=pred))
 }
