@@ -16,11 +16,14 @@ knots <- c(min(internal.knots)-external.knots,internal.knots,max(internal.knots)
 knots <- knots[order(knots)]
 
 # Get all unique doses for predictions
+labels <- expand.grid( x=unique(dat[,2]) , y=unique(dat[,1]) )
 pred.nconc = unique(dat[,3])
 pred.conc = rep(pred.nconc, nchems*nassays)
+pred.assay = rep(labels[,1], each=pred.nconc)
+pred.chemical = rep(labels[,2], each=pred.nconc)
 pred.n = rep(length(unique(dat[,3])), nchems*nassays)
-pred.BE = rep(0,nchems*nassays*nij)
-pred.BEsd = rep(0,nchems*nassays*nij)
+pred.BE = rep(0,nchems*nassays*pred.nconc)
+pred.BEsd = rep(0,nchems*nassays*pred.nconc)
 
 dat.out <- .C("FIT_ZIPLL",
           resp=as.double(dat[,4]),
@@ -50,12 +53,10 @@ dat.out <- .C("FIT_ZIPLL",
 
 dat <- cbind(dat,dat.out$BE,dat.out$BEsd)
 colnames(dat)[5:6] <- c("Pred","Pred.SD")
-
-labels <- expand.grid( x=unique(dat[,2]) , y=unique(dat[,1]) )
 parms <- cbind(labels[,2],labels[,1],dat.out$AC50,dat.out$AC50sd,dat.out$TOP,dat.out$TOPsd,dat.out$active)
 colnames(parms) <- c("chemical","assay","AC50","AC50.sd","Emax","Emax.sd","Pr.Active")
 
-pred = cbind(rep(labels[,2], each=pred.nconc), rep(labels[,1], each=pred.nconc), pred.conc, dat.out$predBE, dat.out$predBEsd)
+pred = cbind(pred.chemical, pred.assay, pred.conc, dat.out$predBE, dat.out$predBEsd)
 colnames(pred) <- c("chemical", "assay", "conc", "Pred","Pred.SD")
 
 return(list(dat=dat, parms=parms,pred=pred))
