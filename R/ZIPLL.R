@@ -54,7 +54,8 @@ labels <- expand.grid( x=unique(dat[,2]) , y=unique(dat[,1]) )
 parms <- cbind(labels[,2],labels[,1],dat.out$AC50,dat.out$AC50sd,dat.out$TOP,dat.out$TOPsd,dat.out$active)
 colnames(parms) <- c("chemical","assay","AC50","AC50.sd","Emax","Emax.sd","Pr.Active")
 
+pred = cbind(dat.out$predBE, dat.out$predBEsd)
+colnames(pred)[5:6] <- c("Pred","Pred.SD")
 
-
-return(list(dat=dat, parms=parms))
+return(list(dat=dat, parms=parms,pred=pred))
 }
