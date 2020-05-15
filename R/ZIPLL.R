@@ -17,7 +17,7 @@ knots <- knots[order(knots)]
 
 # Get all unique doses for predictions
 labels <- expand.grid( x=unique(dat[,2]) , y=unique(dat[,1]) )
-pred.nconc = unique(dat[,3])
+pred.nconc = len(unique(dat[,3]))
 pred.conc = rep(pred.nconc, nchems*nassays)
 pred.assay = rep(labels[,1], each=pred.nconc)
 pred.chemical = rep(labels[,2], each=pred.nconc)
