@@ -3,7 +3,7 @@ function(dat, nitter=2000, burnin=1000, internal.knots=0, kappa=1, mu=c(5,1,3), 
 
 #organize data
 dat <- dat[which(apply(dat, 1, function(x) sum(1*is.na(x)) )==0),]
-dat <- dat[order(dat[,1],dat[,2]),]
+dat <- dat[order(dat[,1],dat[,2],dat[,3]),]
 nassays <- length(unique(dat[,1]))
 nchems <- length(unique(dat[,2]))
 nij <- max(table(dat[,1],dat[,2]), na.rm=TRUE)
@@ -15,7 +15,11 @@ external.knots <- abs(as.numeric(range(log(dat[,3])) %*% c(-1,1))*10*nij)
 knots <- c(min(internal.knots)-external.knots,internal.knots,max(internal.knots)+external.knots)
 knots <- knots[order(knots)]
 
-
+# Get all unique doses for predictions
+pred.conc = rep(unique(dat[,3]), nchems*nassays)
+pred.n = rep(length(unique(dat[,3])), nchems*nassays)
+pred.BE = rep(0,nchems*nassays*nij)
+pred.BEsd = rep(0,nchems*nassays*nij)
 
 dat.out <- .C("FIT_ZIPLL",
           resp=as.double(dat[,4]),
@@ -35,7 +39,11 @@ dat.out <- .C("FIT_ZIPLL",
           smax=as.integer(nitter),
           burnin=as.integer(burnin),
           mu=as.double(mu),
-          sigma=as.double(sigma)
+          sigma=as.double(sigma),
+          predconc=as.double(pred.conc),
+          predn=as.integer(pred.n),
+          predBE=as.double(pred.BE),
+          predBEsd=as.double(pred.BEsd)
 )
 
 
@@ -45,6 +53,8 @@ colnames(dat)[5:6] <- c("Pred","Pred.SD")
 labels <- expand.grid( x=unique(dat[,2]) , y=unique(dat[,1]) )
 parms <- cbind(labels[,2],labels[,1],dat.out$AC50,dat.out$AC50sd,dat.out$TOP,dat.out$TOPsd,dat.out$active)
 colnames(parms) <- c("chemical","assay","AC50","AC50.sd","Emax","Emax.sd","Pr.Active")
+
+
 
 return(list(dat=dat, parms=parms))
 }

@@ -483,13 +483,14 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
 				  double *AC50_out, double *TOP_out, double *AC50sd_out, double *TOPsd_out,
 				  double *active_out, double *kappa,
 				  int *smax, int *burnin,
-				  double *mu_0, double *Diag_Sigma_0
+				  double *mu_0, double *Diag_Sigma_0,
+				  double *predconc, int *predn, double *predBE_in, double *predBEsd_in
 				  ){
 	GetRNGstate();
 	
 	//-------------------------------------------------------------------------------------
 	//indecies
-	int i, i2, j, k, k2, u, chem, assay, rep;
+	int i, i2, i3, j, k, k2, u, chem, assay, rep;
 	
 	//-------------------------------------------------------------------------------------
 	//find number of chemicals and assays
@@ -507,39 +508,58 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
 
 	
 	double **x;
+	double **x_out;
 	x = (double **) calloc(N,sizeof(double*));
+	x_out = (double **) calloc(N,sizeof(double*));
 	for (i=0; i<N; i++) {
-		x[i] = (double *) calloc(max_n, sizeof(double));
+		x[i] = (double *) calloc(n[i], sizeof(double));
+		x_out[i] = (double *) calloc(predn[i], sizeof(double));
 	}
 	double **y;
+	double **y_out;
 	y = (double **) calloc(N,sizeof(double*));
+	y_out = (double **) calloc(N,sizeof(double*));
 	for (i=0; i<N; i++) {
-		y[i] = (double *) calloc(max_n, sizeof(double));
+		y[i] = (double *) calloc(n[i], sizeof(double));
+		y_out[i] = (double *) calloc(predn[i], sizeof(double));
 	}	
 	double **BE;
+	double **BE_out;
 	BE = (double **) calloc(N,sizeof(double*));
+	BE_out = (double **) calloc(N,sizeof(double*));
 	for (i=0; i<N; i++) {
-		BE[i] = (double *) calloc(max_n, sizeof(double));
+		BE[i] = (double *) calloc(n[i], sizeof(double));
+		BE_out[i] = (double *) calloc(predn[i], sizeof(double));
 	}	
 	double **BE2;
+	double **BE2_out;
 	BE2 = (double **) calloc(N,sizeof(double*));
+	BE2_out = (double **) calloc(N,sizeof(double*));
 	for (i=0; i<N; i++) {
-		BE2[i] = (double *) calloc(max_n, sizeof(double));
+		BE2[i] = (double *) calloc(n[i], sizeof(double));
+		BE2_out[i] = (double *) calloc(predn[i], sizeof(double));
 	}
 	
 	
-	
+	i2 = 0; i3 = 0;
 	for(i=0; i<N; i++){
 		AC50_out[i] = 0;
 		TOP_out[i] = 0;
 		AC50sd_out[i] = 0;
 		TOPsd_out[i] = 0;
 		active_out[i] = 0;
-		for(j=0; j<max_n; j++){
-			x[i][j] = conc[j+i*dimx[2]];
-			y[i][j] = resp[j+i*dimx[2]];
+		for(j=0; j<n[i]; j++){
+			x[i][j] = conc[i2];
+			y[i][j] = resp[i2];
 			BE[i][j] = 0; 
 			BE2[i][j] = 0; 
+			i2++;
+		}
+		for(j=0; j<predn[i]; j++){
+			x_out[i][j] = predconc[i3];
+			BE_out[i][j] = 0;
+			BE2_out[i][j] = 0;
+			i3++;
 		}
 	}
 	
@@ -720,11 +740,6 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
 								beta_ac[row_temp], Z[chem][assay],
 								Sigma_bet_inv, mu, sig2_inv
 								);
-			
-				//update Z
-				 Z[chem][assay] = update_Z(	y[row_temp], x[row_temp], n[row_temp], knots, K,
-								theta_ac[row_temp], Z[chem][assay],
-								beta_ac[row_temp], sig2_inv, psi);
 				
 				
 				/*number of updates*/
@@ -822,15 +837,25 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
 				//update SSE and predicted values
 				for(j=0; j<n[row_temp]; j++){
 					// predicted value
-					y_hat = (1-Z[chem][assay]) * (theta_ac[row_temp][1]) 
-							 + Z[chem][assay]  * (theta_ac[row_temp][0] - (theta_ac[row_temp][0]-theta_ac[row_temp][1])/(1+exp(g_func(log(x[row_temp][j]) - log(theta_ac[row_temp][2]), beta_ac[row_temp], knots, K))));
+					y_hat = (theta_ac[row_temp][0] - (theta_ac[row_temp][0]-theta_ac[row_temp][1])/(1+exp(g_func(log(x[row_temp][j]) - log(theta_ac[row_temp][2]), beta_ac[row_temp], knots, K))));
 					//predict at current locations
 					if(rep>*burnin-1){
 						BE[row_temp][j] += y_hat/(*smax-*burnin);  
-						BE2[row_temp][j] += y_hat*y_hat/(*smax-*burnin);  
+						BE2[row_temp][j] += y_hat*y_hat/(*smax-*burnin);
 					}
 					//records SSE
 					SSE += ( y_hat - y[row_temp][j]) * ( y_hat - y[row_temp][j]);  // SSE
+				}
+
+				// Make predictions on the held out data
+				for(j=0; j<predn[row_temp]; j++){
+					// predicted value
+					y_hat = (theta_ac[row_temp][0] - (theta_ac[row_temp][0]-theta_ac[row_temp][1])/(1+exp(g_func(log(x_out[row_temp][j]) - log(theta_ac[row_temp][2]), beta_ac[row_temp], knots, K))));
+					//predict at current locations
+					if(rep>*burnin-1){
+						BE_out[row_temp][j] += y_hat/(*smax-*burnin);  
+						BE2_out[row_temp][j] += y_hat*y_hat/(*smax-*burnin);
+					}
 				}
 				
 				
@@ -965,12 +990,20 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
 	
 		
 	//-------------------------------------------------------------------------------------
+	i2 = 0;
+	i3 = 0;
 	for(i=0; i<N; i++){
 		TOPsd_out[i] = sqrt(TOPsd_out[i] - TOP_out[i]*TOP_out[i]); 
 		AC50sd_out[i] = sqrt(AC50sd_out[i] - AC50_out[i]*AC50_out[i]); 
-		for(j=0; j<max_n; j++){
-			BE_in[j+i*max_n] = BE[i][j];
-			BEsd_in[j+i*max_n] = sqrt(BE2[i][j] - BE[i][j]*BE[i][j]);
+		for(j=0; j<n[i]; j++){
+			BE_in[i2] = BE[i][j];
+			BEsd_in[i2] = sqrt(BE2[i][j] - BE[i][j]*BE[i][j]);
+			i2++;
+		}
+		for(j=0; j<predn[i]; j++){
+			predBE_in[i3] = BE_out[i][j];
+			predBEsd_in[i3] = sqrt(BE2_out[i][j] - BE_out[i][j]*BE_out[i][j]);
+			i3++;
 		}
 	}
 	
@@ -986,7 +1019,9 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
        free(x[i]);  
        free(y[i]);  
        free(BE[i]); 
-       free(BE2[i]);    
+       free(BE2[i]);
+       free(BE_out[i]);
+       free(BE2_out[i]);
     }  
     free(beta_ac); 
     free(theta_ac); 
@@ -995,6 +1030,8 @@ void FIT_ZIPLL(double *resp, double *conc, int *dimx, int *n,
     free(y); 
     free(BE); 
     free(BE2); 
+    free(BE_out);
+    free(BE2_out);
 	
 		
 	PutRNGstate();
